@@ -308,7 +308,7 @@
     id="mapMaster"
     class="map-section map-master"
     data-route-id=""
-    data-routes-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/routes/routes402.json"
+    data-routes-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@f4130a473e4466266e6c2c5225919e903f742e0f/routes/routes402.json"
     data-pois-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/poi/pois602.final.json"
     data-route-markers-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/routes/route_markers_v901.json"
     data-unknown-as-trail="1"
@@ -382,12 +382,13 @@
         .replace(/-/g, " ")
         .replace(/(^|\s)\S/g, s => s.toUpperCase());
 
-      try{
-        const res = await fetch(withCacheBust(ROUTES_URL_BASE), { cache: "no-store" });
-        if (!res.ok) throw new Error("routes fetch failed");
-        const data = await res.json();
-
-        let routeObj = null;
+    try{
+      const url = ROUTES_URL + (ROUTES_URL.includes("?") ? "&" : "?") + "v=" + Date.now();
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("routes fetch failed");
+      const data = await res.json();
+   
+      let routeObj = null;
 
         if (Array.isArray(data?.routes)){
           routeObj = data.routes.find(r => r?.id === routeId);
