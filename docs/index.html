@@ -48,7 +48,7 @@
       border-radius:6px;
     }
 
-    /* ✅ Topplinje: samme bakgrunn som nøkkelinformasjon */
+    /* Header: kun rutenavn, samme farge som panel */
     .embed-header{
       max-width:1200px;
       margin:0 auto 12px;
@@ -58,30 +58,18 @@
       padding:12px 14px;
       display:flex;
       align-items:center;
-      justify-content:space-between;
-      gap:14px;
+      justify-content:flex-start;
     }
     .embed-title{
       margin:0;
-      font-size:22px;
+      font-size:20px;
       line-height:1.15;
       letter-spacing:.2px;
       font-weight:600;
       text-transform:none;
     }
-    .embed-brand{
-      display:flex;
-      align-items:center;
-      justify-content:flex-end;
-      min-width:100px;
-    }
-    .embed-brand img{
-      height:28px;
-      width:auto;
-      display:block;
-      opacity:.95;
-    }
 
+    /* Master-container */
     .map-section.map-master,
     .map-section.map-master *{
       font-family:var(--font) !important;
@@ -146,6 +134,7 @@
       line-height:1.35;
     }
 
+    /* Underlag-legend (fargene må være stabile) */
     .fixedLegendRow{
       padding:10px 16px 0;
       font-size:13px;
@@ -176,10 +165,11 @@
     .sw-gravel{ background:var(--sw-gravel) !important; }
     .sw-trail{ background:var(--sw-trail) !important; }
 
+    /* Høydeprofil */
     .map-section.map-master .chart-wrapper{
       position:relative;
       width:100%;
-      height:240px; /* litt lavere for partner-iframe */
+      height:240px; /* lav nok til partner-iframe */
       background:#fff;
       border-top:1px solid rgba(0,0,0,.08);
       overflow:hidden;
@@ -200,8 +190,27 @@
       pointer-events:none;
     }
 
+    /* Footer-logo under høydeprofil */
+    .embed-footer{
+      background:#fff;
+      border-top:1px solid rgba(0,0,0,.08);
+      padding:10px 16px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+    }
+    .embed-footer-logo{
+      height:28px;
+      width:auto;
+      opacity:.92;
+      display:block;
+    }
+
+    /* Mobil */
     @media (max-width: 900px){
       body{ padding:10px; }
+      .embed-title{ font-size:18px; }
+
       .map-section.map-master .map-wrapper{ flex-direction:column; }
 
       .map-section.map-master .route-popup{
@@ -217,10 +226,12 @@
       }
       .map-section.map-master .route-popup-inner{ max-height:none; }
 
+      /* når collapsed: skjul panel */
       .map-section.map-master.svingom-popup-collapsed .route-popup{
         display:none !important;
       }
 
+      /* knapp som vises når panel er skjult */
       .svingom-open-panel-btn{
         display:none;
         align-items:center;
@@ -239,6 +250,7 @@
         display:flex;
       }
 
+      /* X-knapp som ligger i panelet (ikke på kartet) */
       .svingom-collapse-btn{
         position:absolute;
         top:10px;
@@ -257,8 +269,8 @@
         backdrop-filter: blur(2px);
       }
 
-      .embed-title{ font-size:18px; }
-      .embed-brand img{ height:24px; }
+      .embed-footer{ justify-content:center; }
+      .embed-footer-logo{ height:26px; }
     }
 
     @media (min-width: 901px){
@@ -271,12 +283,9 @@
 <body>
   <div id="routeError" class="error-card" style="display:none"></div>
 
-  <!-- ✅ Kun rutenavn + logo -->
+  <!-- Header: kun rutenavn -->
   <div class="embed-header">
     <h1 id="routeTitle" class="embed-title">SvingOm</h1>
-    <div class="embed-brand">
-      <img id="svingomLogo" alt="SvingOm" />
-    </div>
   </div>
 
   <div
@@ -315,6 +324,13 @@
     <div class="chart-wrapper">
       <canvas></canvas>
     </div>
+
+    <!-- Logo under høydeprofil -->
+    <div class="embed-footer">
+      <img class="embed-footer-logo"
+           src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
+           alt="SvingOm" />
+    </div>
   </div>
 
   <script>
@@ -322,15 +338,9 @@
     const root = document.getElementById("mapMaster");
     const err = document.getElementById("routeError");
     const titleEl = document.getElementById("routeTitle");
-    const logoEl = document.getElementById("svingomLogo");
 
     const params = new URLSearchParams(window.location.search);
     const route = (params.get("route") || "").trim();
-
-    // ✅ Sett logo-URL her:
-    const LOGO_URL = "https://sihoe.github.io/svingom-embed/assets/svingom-logo.png";
-    logoEl.src = LOGO_URL;
-    logoEl.onerror = () => { logoEl.style.display = "none"; };
 
     if (!route){
       err.style.display = "block";
@@ -358,11 +368,8 @@
         }
 
         const nameNo =
-          routeObj?.name?.no ||
-          routeObj?.name ||
-          routeObj?.title?.no ||
-          routeObj?.title ||
-          null;
+          routeObj?.name?.no ??
+          (typeof routeObj?.name === "string" ? routeObj.name : null);
 
         if (nameNo){
           titleEl.textContent = String(nameNo);
@@ -370,17 +377,21 @@
           return;
         }
 
-        titleEl.textContent = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
-        document.title = titleEl.textContent;
+        // fallback (skal i praksis ikke skje)
+        const nice = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
+        titleEl.textContent = nice;
+        document.title = nice;
+
       } catch(e){
-        titleEl.textContent = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
-        document.title = titleEl.textContent;
+        const nice = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
+        titleEl.textContent = nice;
+        document.title = nice;
       }
     }
 
     setTitleFromRoutes(route);
 
-    // ---- Mobil-kollapslogikk ----
+    // ---- Mobil-kollapslogikk (panel kan skjules og komme tilbake) ----
     const openBtn = root.querySelector(".svingom-open-panel-btn");
     const mapEl = root.querySelector(".route-map");
     let collapsed = false;
@@ -439,6 +450,7 @@
       setCollapsed(false);
     });
 
+    // Klikk på POI i kartet åpner panel igjen
     mapEl?.addEventListener("click", (ev)=>{
       if (!isMobile() || !collapsed) return;
       const hit = ev.target && (
@@ -449,6 +461,7 @@
       if (hit) setCollapsed(false);
     }, true);
 
+    // Hold kollapsknapp i live når master oppdaterer DOM
     let scheduled = false;
     new MutationObserver(()=>{
       if (scheduled) return;
