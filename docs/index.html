@@ -190,40 +190,31 @@
       pointer-events:none;
     }
 
-.embed-footer{
-  background:#fff;
-  border-top:1px solid rgba(0,0,0,.08);
-  padding:18px 20px;              /* mer luft */
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-}
+    /* Footer (logo under høydeprofil) */
+    .embed-footer{
+      background:#fff;
+      border-top:1px solid rgba(0,0,0,.08);
+      padding:18px 20px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+    }
+    .embed-footer-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 14px;               /* clear space */
+      border-radius:12px;
+      background:rgba(238,233,224,.55); /* subtil panel-farge */
+      text-decoration:none;
+    }
+    .embed-footer-logo{
+      height:44px; /* tydeligere */
+      width:auto;
+      display:block;
+      opacity:.95;
+    }
 
-.embed-footer-link{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:10px 14px;              /* clear space rundt logo */
-  border-radius:12px;
-  background:rgba(238,233,224,.55); /* subtil panel-farge */
-  text-decoration:none;
-}
-
-.embed-footer-logo{
-  height:40px;   /* opp fra 28px */
-  width:auto;
-  display:block;
-  opacity:.95;
-}
-@media (max-width: 900px){
-  .embed-footer{
-    justify-content:center;
-    padding:16px 16px;
-  }
-  .embed-footer-logo{
-    height:36px;
-  }
-}
     /* Mobil */
     @media (max-width: 900px){
       body{ padding:10px; }
@@ -287,8 +278,13 @@
         backdrop-filter: blur(2px);
       }
 
-      .embed-footer{ justify-content:center; }
-      .embed-footer-logo{ height:26px; }
+      .embed-footer{
+        justify-content:center;
+        padding:16px 16px;
+      }
+      .embed-footer-logo{
+        height:40px;
+      }
     }
 
     @media (min-width: 901px){
@@ -343,11 +339,13 @@
       <canvas></canvas>
     </div>
 
-    <!-- Logo under høydeprofil -->
+    <!-- Logo under høydeprofil (klikkbar) -->
     <div class="embed-footer">
-      <img class="embed-footer-logo"
-           src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
-           alt="SvingOm" />
+      <a id="routeLink" class="embed-footer-link" href="https://www.svingom.no" target="_top" rel="noopener">
+        <img class="embed-footer-logo"
+             src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
+             alt="SvingOm" />
+      </a>
     </div>
   </div>
 
@@ -356,6 +354,7 @@
     const root = document.getElementById("mapMaster");
     const err = document.getElementById("routeError");
     const titleEl = document.getElementById("routeTitle");
+    const routeLinkEl = document.getElementById("routeLink");
 
     const params = new URLSearchParams(window.location.search);
     const route = (params.get("route") || "").trim();
@@ -372,7 +371,11 @@
 
     const ROUTES_URL = root.getAttribute("data-routes-url");
 
-    async function setTitleFromRoutes(routeId){
+    async function setTitleAndLinkFromRoutes(routeId){
+      const niceFallback = routeId
+        .replace(/-/g, " ")
+        .replace(/(^|\s)\S/g, s => s.toUpperCase());
+
       try{
         const res = await fetch(ROUTES_URL, { cache: "no-store" });
         if (!res.ok) throw new Error("routes fetch failed");
@@ -389,25 +392,26 @@
           routeObj?.name?.no ??
           (typeof routeObj?.name === "string" ? routeObj.name : null);
 
-        if (nameNo){
-          titleEl.textContent = String(nameNo);
-          document.title = String(nameNo);
-          return;
+        const pageUrl =
+          (typeof routeObj?.pageUrl === "string" ? routeObj.pageUrl : null) ??
+          (typeof routeObj?.pageUrl?.no === "string" ? routeObj.pageUrl.no : null);
+
+        const title = nameNo ? String(nameNo) : niceFallback;
+        titleEl.textContent = title;
+        document.title = title;
+
+        if (routeLinkEl){
+          routeLinkEl.href = pageUrl ? String(pageUrl) : "https://www.svingom.no";
         }
 
-        // fallback (skal i praksis ikke skje)
-        const nice = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
-        titleEl.textContent = nice;
-        document.title = nice;
-
       } catch(e){
-        const nice = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
-        titleEl.textContent = nice;
-        document.title = nice;
+        titleEl.textContent = niceFallback;
+        document.title = niceFallback;
+        if (routeLinkEl) routeLinkEl.href = "https://www.svingom.no";
       }
     }
 
-    setTitleFromRoutes(route);
+    setTitleAndLinkFromRoutes(route);
 
     // ---- Mobil-kollapslogikk (panel kan skjules og komme tilbake) ----
     const openBtn = root.querySelector(".svingom-open-panel-btn");
@@ -468,7 +472,7 @@
       setCollapsed(false);
     });
 
-    // Klikk på POI i kartet åpner panel igjen
+    // Klikk på POI/objekt i kartet åpner panel igjen (fallback)
     mapEl?.addEventListener("click", (ev)=>{
       if (!isMobile() || !collapsed) return;
       const hit = ev.target && (
