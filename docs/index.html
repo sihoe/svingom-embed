@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SvingOm</title>
+
+  <!-- LIBS (før master) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.4.0/gpx.min.js"></script>
+
+  <style>
+    :root{
+      --text:#422426;
+      --bg:#ffffff;
+      --panel:#EEE9E0;
+      --accent:#CA6B2A;
+      --radius:14px;
+      --font:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+
+      --sw-asphalt:#2f3447;
+      --sw-gravel:#a88d6a;
+      --sw-trail:#4b6b4b;
+    }
+
+    body{
+      margin:0;
+      padding:16px;
+      font-family:var(--font);
+      color:var(--text);
+      background:#f6f6f6;
+    }
+
+    .error-card{
+      max-width:1200px;
+      margin:0 auto 12px;
+      background:#fff;
+      border:1px solid rgba(0,0,0,.12);
+      border-left:6px solid var(--accent);
+      border-radius:var(--radius);
+      padding:14px 16px;
+    }
+    .error-card code{
+      background:#f1f1f1;
+      padding:2px 6px;
+      border-radius:6px;
+    }
+
+    /* ✅ Topplinje: samme bakgrunn som nøkkelinformasjon */
+    .embed-header{
+      max-width:1200px;
+      margin:0 auto 12px;
+      background:var(--panel);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:var(--radius);
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+    }
+    .embed-title{
+      margin:0;
+      font-size:22px;
+      line-height:1.15;
+      letter-spacing:.2px;
+      font-weight:600;
+      text-transform:none;
+    }
+    .embed-brand{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      min-width:100px;
+    }
+    .embed-brand img{
+      height:28px;
+      width:auto;
+      display:block;
+      opacity:.95;
+    }
+
+    .map-section.map-master,
+    .map-section.map-master *{
+      font-family:var(--font) !important;
+      font-weight:400 !important;
+      box-sizing:border-box;
+    }
+
+    .map-section.map-master{
+      max-width:1200px;
+      margin:0 auto;
+      background:var(--bg);
+      border:1px solid rgba(0,0,0,.08);
+      border-radius:var(--radius);
+      overflow:hidden;
+      position:relative;
+    }
+
+    .map-section.map-master .map-wrapper{
+      display:flex;
+      align-items:stretch;
+      width:100%;
+      margin:0;
+    }
+
+    .map-section.map-master .route-map{
+      flex:1 1 auto;
+      min-height:420px;
+      height:60vh;
+      max-height:700px;
+      background:#ddd;
+      position:relative;
+    }
+
+    .map-section.map-master .route-popup{
+      flex:0 0 360px;
+      width:360px;
+      background:var(--panel);
+      color:var(--text);
+      border-left:1px solid rgba(0,0,0,.08);
+      padding:16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .map-section.map-master .route-popup-inner{
+      max-height:calc(60vh - 32px);
+      overflow-y:auto;
+      padding-right:6px;
+    }
+
+    .map-section.map-master .route-popup img{
+      display:block;
+      width:100% !important;
+      height:auto !important;
+      max-width:100% !important;
+      border-radius:12px;
+    }
+
+    .map-section.map-master .surface-summary{
+      padding:10px 16px 0;
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    .fixedLegendRow{
+      padding:10px 16px 0;
+      font-size:13px;
+      line-height:1.35;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      background:#fff;
+    }
+    .elev-legend{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:rgba(66,36,38,.75);
+    }
+    .swatch{
+      width:12px;
+      height:12px;
+      border-radius:4px;
+      display:inline-block;
+      margin-right:6px;
+      vertical-align:-2px;
+    }
+    .sw-asphalt{ background:var(--sw-asphalt) !important; }
+    .sw-gravel{ background:var(--sw-gravel) !important; }
+    .sw-trail{ background:var(--sw-trail) !important; }
+
+    .map-section.map-master .chart-wrapper{
+      position:relative;
+      width:100%;
+      height:240px; /* litt lavere for partner-iframe */
+      background:#fff;
+      border-top:1px solid rgba(0,0,0,.08);
+      overflow:hidden;
+    }
+    .map-section.map-master .chart-wrapper canvas{
+      display:block;
+      width:100% !important;
+      height:100% !important;
+      position:relative;
+      z-index:1;
+    }
+    .map-section.map-master .chart-wrapper .surface-strip,
+    .map-section.map-master .chart-wrapper .surface-bands,
+    .map-section.map-master .chart-wrapper .surface-overlay{
+      position:absolute;
+      left:0; right:0; top:0;
+      z-index:2;
+      pointer-events:none;
+    }
+
+    @media (max-width: 900px){
+      body{ padding:10px; }
+      .map-section.map-master .map-wrapper{ flex-direction:column; }
+
+      .map-section.map-master .route-popup{
+        width:100%;
+        flex:0 0 auto;
+        border-left:none;
+        border-top:1px solid rgba(0,0,0,.08);
+      }
+
+      .map-section.map-master .route-map{
+        height:52vh;
+        max-height:560px;
+      }
+      .map-section.map-master .route-popup-inner{ max-height:none; }
+
+      .map-section.map-master.svingom-popup-collapsed .route-popup{
+        display:none !important;
+      }
+
+      .svingom-open-panel-btn{
+        display:none;
+        align-items:center;
+        justify-content:center;
+        padding:10px 14px;
+        border-radius:999px;
+        border:0;
+        background:var(--accent);
+        color:#fff;
+        font:inherit;
+        cursor:pointer;
+        margin:12px 16px 0 16px;
+        width: calc(100% - 32px);
+      }
+      .map-section.map-master.svingom-popup-collapsed .svingom-open-panel-btn{
+        display:flex;
+      }
+
+      .svingom-collapse-btn{
+        position:absolute;
+        top:10px;
+        right:10px;
+        width:44px;
+        height:44px;
+        border-radius:12px;
+        border:1px solid rgba(0,0,0,.12);
+        background:rgba(255,255,255,.65);
+        color:var(--text);
+        font-size:26px;
+        line-height:1;
+        cursor:pointer;
+        z-index:999999;
+        display:none;
+        backdrop-filter: blur(2px);
+      }
+
+      .embed-title{ font-size:18px; }
+      .embed-brand img{ height:24px; }
+    }
+
+    @media (min-width: 901px){
+      .svingom-open-panel-btn{ display:none !important; }
+      .svingom-collapse-btn{ display:none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="routeError" class="error-card" style="display:none"></div>
+
+  <!-- ✅ Kun rutenavn + logo -->
+  <div class="embed-header">
+    <h1 id="routeTitle" class="embed-title">SvingOm</h1>
+    <div class="embed-brand">
+      <img id="svingomLogo" alt="SvingOm" />
+    </div>
+  </div>
+
+  <div
+    id="mapMaster"
+    class="map-section map-master"
+    data-route-id=""
+    data-routes-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/routes/routes402.json"
+    data-pois-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/poi/pois602.final.json"
+    data-route-markers-url="https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/routes/route_markers_v901.json"
+    data-unknown-as-trail="1"
+    data-center-lat="59.83467"
+    data-center-lng="9.57846"
+    data-zoom="11"
+    data-enable-fullscreen="1"
+    data-enable-position="1"
+  >
+    <div class="map-wrapper">
+      <div class="route-map"></div>
+      <div class="route-popup">
+        <div class="route-popup-inner"></div>
+      </div>
+    </div>
+
+    <button type="button" class="svingom-open-panel-btn">Vis POI og nøkkelinformasjon</button>
+
+    <div class="surface-summary"></div>
+
+    <div class="fixedLegendRow">
+      <div class="elev-legend" aria-label="Fargeforklaring underlag">
+        <span><span class="swatch sw-asphalt"></span>Asfalt</span>
+        <span><span class="swatch sw-gravel"></span>Grus</span>
+        <span><span class="swatch sw-trail"></span>Sti</span>
+      </div>
+    </div>
+
+    <div class="chart-wrapper">
+      <canvas></canvas>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const root = document.getElementById("mapMaster");
+    const err = document.getElementById("routeError");
+    const titleEl = document.getElementById("routeTitle");
+    const logoEl = document.getElementById("svingomLogo");
+
+    const params = new URLSearchParams(window.location.search);
+    const route = (params.get("route") || "").trim();
+
+    // ✅ Sett logo-URL her:
+    const LOGO_URL = "https://sihoe.github.io/svingom-embed/assets/svingom-logo.png";
+    logoEl.src = LOGO_URL;
+    logoEl.onerror = () => { logoEl.style.display = "none"; };
+
+    if (!route){
+      err.style.display = "block";
+      err.innerHTML =
+        "Mangler <code>?route=...</code> i URL.<br><br>" +
+        "Eksempel: <code>?route=fjellruta-over-vegglifjell</code>";
+      return;
+    }
+
+    root.setAttribute("data-route-id", route);
+
+    const ROUTES_URL = root.getAttribute("data-routes-url");
+
+    async function setTitleFromRoutes(routeId){
+      try{
+        const res = await fetch(ROUTES_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("routes fetch failed");
+        const data = await res.json();
+
+        let routeObj = null;
+        if (Array.isArray(data?.routes)){
+          routeObj = data.routes.find(r => r.id === routeId);
+        } else if (data && typeof data === "object"){
+          routeObj = data[routeId] || Object.values(data).find(r => r?.id === routeId);
+        }
+
+        const nameNo =
+          routeObj?.name?.no ||
+          routeObj?.name ||
+          routeObj?.title?.no ||
+          routeObj?.title ||
+          null;
+
+        if (nameNo){
+          titleEl.textContent = String(nameNo);
+          document.title = String(nameNo);
+          return;
+        }
+
+        titleEl.textContent = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
+        document.title = titleEl.textContent;
+      } catch(e){
+        titleEl.textContent = routeId.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
+        document.title = titleEl.textContent;
+      }
+    }
+
+    setTitleFromRoutes(route);
+
+    // ---- Mobil-kollapslogikk ----
+    const openBtn = root.querySelector(".svingom-open-panel-btn");
+    const mapEl = root.querySelector(".route-map");
+    let collapsed = false;
+
+    function isMobile(){
+      return window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+    }
+
+    function setCollapsed(on){
+      collapsed = !!on;
+      if (isMobile()){
+        root.classList.toggle("svingom-popup-collapsed", collapsed);
+      } else {
+        root.classList.remove("svingom-popup-collapsed");
+        collapsed = false;
+      }
+      syncCollapseButton();
+    }
+
+    function ensureCollapseButton(){
+      if (!isMobile()) return null;
+      const popup = root.querySelector(".route-popup");
+      if (!popup) return null;
+
+      if (getComputedStyle(popup).position === "static") popup.style.position = "relative";
+
+      let btn = popup.querySelector(".svingom-collapse-btn");
+      const stray = root.querySelector(".svingom-collapse-btn");
+      if (!btn && stray) btn = stray;
+
+      if (!btn){
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "svingom-collapse-btn";
+        btn.setAttribute("aria-label", "Skjul POI og nøkkelinformasjon");
+        btn.textContent = "×";
+        btn.addEventListener("click", (e)=>{
+          e.preventDefault();
+          setCollapsed(true);
+        });
+      }
+      if (btn.parentElement !== popup){
+        popup.appendChild(btn);
+      }
+      return btn;
+    }
+
+    function syncCollapseButton(){
+      const btn = ensureCollapseButton();
+      if (!btn) return;
+      btn.style.display = (isMobile() && !collapsed) ? "inline-flex" : "none";
+    }
+
+    openBtn?.addEventListener("click", (e)=>{
+      e.preventDefault();
+      setCollapsed(false);
+    });
+
+    mapEl?.addEventListener("click", (ev)=>{
+      if (!isMobile() || !collapsed) return;
+      const hit = ev.target && (
+        ev.target.closest?.(".leaflet-marker-icon") ||
+        ev.target.closest?.(".leaflet-interactive") ||
+        ev.target.closest?.(".leaflet-marker-pane")
+      );
+      if (hit) setCollapsed(false);
+    }, true);
+
+    let scheduled = false;
+    new MutationObserver(()=>{
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(()=>{
+        scheduled = false;
+        if (collapsed && isMobile()) root.classList.add("svingom-popup-collapsed");
+        syncCollapseButton();
+      });
+    }).observe(root, { childList:true, subtree:true });
+
+    window.addEventListener("resize", ()=>{
+      if (!isMobile()) setCollapsed(false);
+      else root.classList.toggle("svingom-popup-collapsed", collapsed);
+      syncCollapseButton();
+    }, { passive:true });
+
+    setCollapsed(false);
+    setTimeout(syncCollapseButton, 200);
+
+    // ---- Last master etter at route-id er satt ----
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/js/route_map_master214.js";
+    s.defer = true;
+    document.head.appendChild(s);
+  })();
+  </script>
+</body>
+</html>
