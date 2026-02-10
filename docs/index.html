@@ -25,10 +25,9 @@
       --sw-trail:#4b6b4b;
     }
 
-    html, body { height:100%; }
     body{
       margin:0;
-      padding:12px;
+      padding:16px;
       font-family:var(--font);
       color:var(--text);
       background:#f6f6f6;
@@ -67,6 +66,7 @@
       line-height:1.15;
       letter-spacing:.2px;
       font-weight:600;
+      text-transform:none;
     }
 
     /* Master-container */
@@ -97,8 +97,8 @@
     .map-section.map-master .route-map{
       flex:1 1 auto;
       min-height:420px;
-      height:58vh;
-      max-height:680px;
+      height:60vh;
+      max-height:700px;
       background:#ddd;
       position:relative;
     }
@@ -115,7 +115,7 @@
     }
 
     .map-section.map-master .route-popup-inner{
-      max-height:calc(58vh - 32px);
+      max-height:calc(60vh - 32px);
       overflow-y:auto;
       padding-right:6px;
     }
@@ -128,16 +128,9 @@
       border-radius:12px;
     }
 
-    .map-section.map-master .surface-summary{
-      padding:10px 16px 0;
-      font-size:14px;
-      line-height:1.35;
-      background:#fff;
-    }
-
-    /* Underlag-legend */
+    /* Underlag-legend (fargene må være stabile) */
     .fixedLegendRow{
-      padding:8px 16px 0;
+      padding:10px 16px 0;
       font-size:13px;
       line-height:1.35;
       display:flex;
@@ -191,25 +184,24 @@
       pointer-events:none;
     }
 
-    /* Footer med logo (ingen bakgrunn, mer luft) */
+    /* Footer: logo (klikkbar), ingen bakgrunn bak selve logoen */
     .embed-footer{
       background:#fff;
       border-top:1px solid rgba(0,0,0,.08);
-      padding:18px 22px;
+      padding:20px 22px;
       display:flex;
       align-items:center;
-      justify-content:flex-end; /* høyre også på desktop */
+      justify-content:flex-end; /* høyre også på mobil */
     }
     .embed-footer-link{
       display:inline-flex;
       align-items:center;
-      justify-content:center;
-      padding:10px 12px; /* clear space */
+      justify-content:flex-end;
       text-decoration:none;
-      border-radius:14px;
+      padding:8px 6px; /* clear space rundt logo */
     }
     .embed-footer-logo{
-      height:52px; /* større */
+      height:44px;
       width:auto;
       display:block;
       opacity:.98;
@@ -235,12 +227,10 @@
       }
       .map-section.map-master .route-popup-inner{ max-height:none; }
 
-      /* collapsed: skjul panel */
       .map-section.map-master.svingom-popup-collapsed .route-popup{
         display:none !important;
       }
 
-      /* knapp når panel er skjult */
       .svingom-open-panel-btn{
         display:none;
         align-items:center;
@@ -259,7 +249,6 @@
         display:flex;
       }
 
-      /* X-knapp i panelet */
       .svingom-collapse-btn{
         position:absolute;
         top:10px;
@@ -268,7 +257,7 @@
         height:44px;
         border-radius:12px;
         border:1px solid rgba(0,0,0,.12);
-        background:rgba(255,255,255,.75);
+        background:rgba(255,255,255,.65);
         color:var(--text);
         font-size:26px;
         line-height:1;
@@ -278,14 +267,8 @@
         backdrop-filter: blur(2px);
       }
 
-      /* logo høyre også på mobil */
-      .embed-footer{
-        justify-content:flex-end;
-        padding:16px 18px;
-      }
-      .embed-footer-logo{
-        height:48px;
-      }
+      .embed-footer{ justify-content:flex-end; padding:18px 18px; }
+      .embed-footer-logo{ height:42px; }
     }
 
     @media (min-width: 901px){
@@ -325,8 +308,6 @@
 
     <button type="button" class="svingom-open-panel-btn">Vis POI og nøkkelinformasjon</button>
 
-    <div class="surface-summary"></div>
-
     <div class="fixedLegendRow">
       <div class="elev-legend" aria-label="Fargeforklaring underlag">
         <span><span class="swatch sw-asphalt"></span>Asfalt</span>
@@ -339,9 +320,9 @@
       <canvas></canvas>
     </div>
 
-    <!-- Logo under høydeprofil: lenke settes dynamisk fra routes402.pageUrl -->
+    <!-- Footer: klikkbar logo til rute (pageUrl) -->
     <div class="embed-footer">
-      <a id="svingomLogoLink" class="embed-footer-link" href="https://www.svingom.no/" target="_blank" rel="noopener">
+      <a id="routeFooterLink" class="embed-footer-link" href="https://www.svingom.no" target="_top" rel="noopener">
         <img class="embed-footer-logo"
              src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
              alt="SvingOm" />
@@ -354,46 +335,59 @@
     const root = document.getElementById("mapMaster");
     const err = document.getElementById("routeError");
     const titleEl = document.getElementById("routeTitle");
-    const logoLinkEl = document.getElementById("svingomLogoLink");
+    const footerLink = document.getElementById("routeFooterLink");
 
     const params = new URLSearchParams(window.location.search);
-    const route = (params.get("route") || "").trim();
+    const routeId = (params.get("route") || "").trim();
 
-    if (!route){
+    if (!routeId){
       err.style.display = "block";
       err.innerHTML =
         "Mangler <code>?route=...</code> i URL.<br><br>" +
         "Eksempel: <code>?route=smadoldalen-rundt</code>";
-      // Vi loader ikke master uten route (for å unngå rare state)
       return;
     }
 
-    root.setAttribute("data-route-id", route);
+    root.setAttribute("data-route-id", routeId);
 
     const ROUTES_URL = root.getAttribute("data-routes-url");
 
-    async function setTitleAndLogoLinkFromRoutes(routeId){
-      const niceFallback = routeId
-        .replace(/-/g, " ")
-        .replace(/(^|\s)\S/g, s => s.toUpperCase());
+    function niceTitleFallback(id){
+      return id.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
+    }
+
+    async function setTitleAndLinkFromRoutes(id){
+      const url = ROUTES_URL + (ROUTES_URL.includes("?") ? "&" : "?") + "v=" + Date.now();
 
       try{
-        // Cache-bust HARD, ellers får du “den går til forsiden”-spøkelset
-        const url = ROUTES_URL + (ROUTES_URL.includes("?") ? "&" : "?") + "v=" + Date.now();
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("routes fetch failed");
         const data = await res.json();
 
         let routeObj = null;
 
-        if (Array.isArray(data?.routes)){
-          routeObj = data.routes.find(r => r?.id === routeId) || null;
+        if (Array.isArray(data?.routes)) {
+          routeObj = data.routes.find(r => r?.id === id) || null;
+        } else if (data && typeof data === "object" && !Array.isArray(data)) {
+          routeObj = data[id] || null;
+          if (!routeObj) {
+            routeObj = Object.values(data).find(r => r?.id === id) || null;
+          }
+        } else if (Array.isArray(data)) {
+          routeObj = data.find(r => r?.id === id) || null;
         }
-        if (!routeObj && data && typeof data === "object" && !Array.isArray(data)){
-          routeObj = data[routeId] || null;
-        }
-        if (!routeObj && Array.isArray(data)){
-          routeObj = data.find(r => r?.id === routeId) || null;
+
+        if (!routeObj){
+          const fallback = niceTitleFallback(id);
+          titleEl.textContent = fallback;
+          document.title = fallback;
+
+          err.style.display = "block";
+          err.innerHTML =
+            "Fant ikke rute-id <code>" + id + "</code> i routes402.json.<br><br>" +
+            "Sjekk at <code>id</code> finnes og at URL bruker riktig route-id.";
+          footerLink.href = "https://www.svingom.no";
+          return;
         }
 
         const nameNo =
@@ -401,32 +395,29 @@
           (typeof routeObj?.name === "string" ? routeObj.name : null);
 
         const pageUrl =
-          routeObj?.pageUrl && typeof routeObj.pageUrl === "string"
-            ? routeObj.pageUrl.trim()
-            : "";
+          routeObj?.pageUrl && String(routeObj.pageUrl).trim()
+            ? String(routeObj.pageUrl).trim()
+            : "https://www.svingom.no";
 
-        // Title
-        const title = nameNo ? String(nameNo) : niceFallback;
+        const title = nameNo ? String(nameNo) : niceTitleFallback(id);
+
         titleEl.textContent = title;
         document.title = title;
 
-        // Logo link -> route pageUrl (fallback til svingom.no)
-        if (logoLinkEl){
-          logoLinkEl.href = pageUrl || "https://www.svingom.no/";
-        }
+        // IMPORTANT: dette er hele poenget – logoen skal til ruten
+        footerLink.href = pageUrl;
 
       } catch(e){
-        // fallback: i verste fall får du tittel, og logo går til forsiden
-        titleEl.textContent = niceFallback;
-        document.title = niceFallback;
-        if (logoLinkEl) logoLinkEl.href = "https://www.svingom.no/";
+        const fallback = niceTitleFallback(id);
+        titleEl.textContent = fallback;
+        document.title = fallback;
+        footerLink.href = "https://www.svingom.no";
       }
     }
 
-    // Sett tittel + logo-link ASAP
-    setTitleAndLogoLinkFromRoutes(route);
+    setTitleAndLinkFromRoutes(routeId);
 
-    // ---- Mobil-kollapslogikk (panel kan skjules og komme tilbake) ----
+    // ---- Mobil-kollapslogikk ----
     const openBtn = root.querySelector(".svingom-open-panel-btn");
     const mapEl = root.querySelector(".route-map");
     let collapsed = false;
@@ -480,7 +471,6 @@
       setCollapsed(false);
     });
 
-    // Klikk på POI i kartet åpner panel igjen (når det er skjult)
     mapEl?.addEventListener("click", (ev)=>{
       if (!isMobile() || !collapsed) return;
       const hit = ev.target && (
@@ -491,7 +481,6 @@
       if (hit) setCollapsed(false);
     }, true);
 
-    // Hold kollapsknapp i live når master oppdaterer DOM
     let scheduled = false;
     new MutationObserver(()=>{
       if (scheduled) return;
@@ -512,9 +501,9 @@
     setCollapsed(false);
     setTimeout(syncCollapseButton, 200);
 
-    // ---- Last master etter at route-id er satt ----
+    // ---- Last master (cache-bust) ----
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/js/route_map_master214.js";
+    s.src = "https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/js/route_map_master214.js?v=" + Date.now();
     s.defer = true;
     document.head.appendChild(s);
   })();
