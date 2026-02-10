@@ -128,7 +128,13 @@
       border-radius:12px;
     }
 
-    /* Underlag-legend (fargene må være stabile) */
+    .map-section.map-master .surface-summary{
+      padding:10px 16px 0;
+      font-size:14px;
+      line-height:1.35;
+    }
+
+    /* Underlag-legend */
     .fixedLegendRow{
       padding:10px 16px 0;
       font-size:13px;
@@ -184,27 +190,30 @@
       pointer-events:none;
     }
 
-    /* Footer: logo (klikkbar), ingen bakgrunn bak selve logoen */
+    /* Footer: hvit bakgrunn, logo til høyre (også på mobil) */
     .embed-footer{
       background:#fff;
       border-top:1px solid rgba(0,0,0,.08);
-      padding:20px 22px;
+      padding:18px 20px;
       display:flex;
       align-items:center;
-      justify-content:flex-end; /* høyre også på mobil */
+      justify-content:flex-end;
     }
+
     .embed-footer-link{
       display:inline-flex;
       align-items:center;
-      justify-content:flex-end;
+      justify-content:center;
+      padding:10px 12px;   /* clear space */
       text-decoration:none;
-      padding:8px 6px; /* clear space rundt logo */
+      background:transparent; /* ingen bakgrunn */
     }
+
     .embed-footer-logo{
       height:44px;
       width:auto;
       display:block;
-      opacity:.98;
+      opacity:.95;
     }
 
     /* Mobil */
@@ -227,10 +236,12 @@
       }
       .map-section.map-master .route-popup-inner{ max-height:none; }
 
+      /* når collapsed: skjul panel */
       .map-section.map-master.svingom-popup-collapsed .route-popup{
         display:none !important;
       }
 
+      /* knapp som vises når panel er skjult */
       .svingom-open-panel-btn{
         display:none;
         align-items:center;
@@ -249,6 +260,7 @@
         display:flex;
       }
 
+      /* X-knapp som ligger i panelet */
       .svingom-collapse-btn{
         position:absolute;
         top:10px;
@@ -267,8 +279,14 @@
         backdrop-filter: blur(2px);
       }
 
-      .embed-footer{ justify-content:flex-end; padding:18px 18px; }
-      .embed-footer-logo{ height:42px; }
+      /* footer: fortsatt høyre */
+      .embed-footer{
+        justify-content:flex-end;
+        padding:16px 16px;
+      }
+      .embed-footer-logo{
+        height:40px;
+      }
     }
 
     @media (min-width: 901px){
@@ -308,6 +326,8 @@
 
     <button type="button" class="svingom-open-panel-btn">Vis POI og nøkkelinformasjon</button>
 
+    <div class="surface-summary"></div>
+
     <div class="fixedLegendRow">
       <div class="elev-legend" aria-label="Fargeforklaring underlag">
         <span><span class="swatch sw-asphalt"></span>Asfalt</span>
@@ -320,12 +340,21 @@
       <canvas></canvas>
     </div>
 
-    <!-- Footer: klikkbar logo til rute (pageUrl) -->
+    <!-- Footer: logo som lenke (href settes fra routes402.pageUrl) -->
     <div class="embed-footer">
-      <a id="routeFooterLink" class="embed-footer-link" href="https://www.svingom.no" target="_top" rel="noopener">
-        <img class="embed-footer-logo"
-             src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
-             alt="SvingOm" />
+      <a
+        id="routeFooterLink"
+        class="embed-footer-link"
+        href="https://www.svingom.no/"
+        target="_blank"
+        rel="noopener"
+        aria-label="Åpne rutesiden på SvingOm"
+      >
+        <img
+          class="embed-footer-logo"
+          src="https://sihoe.github.io/svingom-embed/assets/svingom-logo.png"
+          alt="SvingOm"
+        />
       </a>
     </div>
   </div>
@@ -351,73 +380,90 @@
     root.setAttribute("data-route-id", routeId);
 
     const ROUTES_URL = root.getAttribute("data-routes-url");
+    const DEFAULT_URL = "https://www.svingom.no/";
+    let desiredFooterHref = DEFAULT_URL;
 
-    function niceTitleFallback(id){
+    function titleCaseFromId(id){
       return id.replace(/-/g, " ").replace(/(^|\s)\S/g, s => s.toUpperCase());
     }
 
+    function findRouteObj(data, id){
+      // støtter flere mulige strukturer
+      if (!data) return null;
+
+      if (Array.isArray(data?.routes)) {
+        return data.routes.find(r => r?.id === id) || null;
+      }
+      if (Array.isArray(data)) {
+        return data.find(r => r?.id === id) || null;
+      }
+      if (typeof data === "object") {
+        if (data[id]) return data[id];
+        // fallback: søk i verdier
+        const vals = Object.values(data);
+        return vals.find(r => r?.id === id) || null;
+      }
+      return null;
+    }
+
     async function setTitleAndLinkFromRoutes(id){
-      const url = ROUTES_URL + (ROUTES_URL.includes("?") ? "&" : "?") + "v=" + Date.now();
+      const nice = titleCaseFromId(id);
 
       try{
+        const url = ROUTES_URL + (ROUTES_URL.includes("?") ? "&" : "?") + "v=" + Date.now();
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("routes fetch failed");
         const data = await res.json();
 
-        let routeObj = null;
-
-        if (Array.isArray(data?.routes)) {
-          routeObj = data.routes.find(r => r?.id === id) || null;
-        } else if (data && typeof data === "object" && !Array.isArray(data)) {
-          routeObj = data[id] || null;
-          if (!routeObj) {
-            routeObj = Object.values(data).find(r => r?.id === id) || null;
-          }
-        } else if (Array.isArray(data)) {
-          routeObj = data.find(r => r?.id === id) || null;
-        }
-
-        if (!routeObj){
-          const fallback = niceTitleFallback(id);
-          titleEl.textContent = fallback;
-          document.title = fallback;
-
-          err.style.display = "block";
-          err.innerHTML =
-            "Fant ikke rute-id <code>" + id + "</code> i routes402.json.<br><br>" +
-            "Sjekk at <code>id</code> finnes og at URL bruker riktig route-id.";
-          footerLink.href = "https://www.svingom.no";
-          return;
-        }
-
+        const routeObj = findRouteObj(data, id);
         const nameNo =
           routeObj?.name?.no ??
           (typeof routeObj?.name === "string" ? routeObj.name : null);
 
         const pageUrl =
-          routeObj?.pageUrl && String(routeObj.pageUrl).trim()
-            ? String(routeObj.pageUrl).trim()
-            : "https://www.svingom.no";
+          (typeof routeObj?.pageUrl === "string" && routeObj.pageUrl.trim()) ? routeObj.pageUrl.trim() : null;
 
-        const title = nameNo ? String(nameNo) : niceTitleFallback(id);
+        titleEl.textContent = nameNo ? String(nameNo) : nice;
+        document.title = titleEl.textContent;
 
-        titleEl.textContent = title;
-        document.title = title;
-
-        // IMPORTANT: dette er hele poenget – logoen skal til ruten
-        footerLink.href = pageUrl;
+        desiredFooterHref = pageUrl || DEFAULT_URL;
+        applyFooterHref(true);
 
       } catch(e){
-        const fallback = niceTitleFallback(id);
-        titleEl.textContent = fallback;
-        document.title = fallback;
-        footerLink.href = "https://www.svingom.no";
+        titleEl.textContent = nice;
+        document.title = nice;
+        desiredFooterHref = DEFAULT_URL;
+        applyFooterHref(true);
       }
     }
 
-    setTitleAndLinkFromRoutes(routeId);
+    function applyFooterHref(force){
+      if (!footerLink) return;
+      const current = footerLink.getAttribute("href") || "";
+      if (force || current !== desiredFooterHref){
+        footerLink.setAttribute("href", desiredFooterHref);
+      }
+    }
 
-    // ---- Mobil-kollapslogikk ----
+    // Enforcer: hvis master/script overskriver href tilbake til forsiden, setter vi den tilbake
+    function startFooterEnforcer(){
+      // kort retry-loop (dekker timing rundt master-init)
+      let tries = 0;
+      const t = setInterval(() => {
+        applyFooterHref(false);
+        tries++;
+        if (tries >= 40) clearInterval(t); // ~6 sekunder
+      }, 150);
+
+      // observer DOM for endringer (dekker re-render)
+      new MutationObserver(() => applyFooterHref(false))
+        .observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:["href"] });
+    }
+
+    setTitleAndLinkFromRoutes(routeId);
+    startFooterEnforcer();
+
+    // ---- Mobil-kollapslogikk (panel kan skjules og komme tilbake) ----
     const openBtn = root.querySelector(".svingom-open-panel-btn");
     const mapEl = root.querySelector(".route-map");
     let collapsed = false;
@@ -471,6 +517,7 @@
       setCollapsed(false);
     });
 
+    // Klikk på POI i kartet åpner panel igjen
     mapEl?.addEventListener("click", (ev)=>{
       if (!isMobile() || !collapsed) return;
       const hit = ev.target && (
@@ -501,7 +548,7 @@
     setCollapsed(false);
     setTimeout(syncCollapseButton, 200);
 
-    // ---- Last master (cache-bust) ----
+    // ---- Last master etter at route-id er satt ----
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/gh/sihoe/kartdata@main/js/route_map_master214.js?v=" + Date.now();
     s.defer = true;
