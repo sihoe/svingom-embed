@@ -365,7 +365,11 @@
     const err = document.getElementById("routeError");
     const titleEl = document.getElementById("routeTitle");
     const footerLink = document.getElementById("routeFooterLink");
-
+  footerLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+  const href = footerLink.getAttribute("href") || "https://www.svingom.no/";
+    window.open(href, "_blank", "noopener,noreferrer");
+  });
     const params = new URLSearchParams(window.location.search);
     const routeId = (params.get("route") || "").trim();
 
