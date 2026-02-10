@@ -190,11 +190,11 @@
       pointer-events:none;
     }
 
-    /* Footer (logo under høydeprofil) */
+    /* Footer med logo (kun hvit/transparent, mer luft) */
     .embed-footer{
       background:#fff;
       border-top:1px solid rgba(0,0,0,.08);
-      padding:18px 20px;
+      padding:22px 26px;      /* clear space rundt logo */
       display:flex;
       align-items:center;
       justify-content:flex-end;
@@ -203,16 +203,21 @@
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      padding:10px 14px;               /* clear space */
-      border-radius:12px;
-      background:rgba(238,233,224,.55); /* subtil panel-farge */
+      padding:0;
+      background:transparent;
+      border-radius:0;
       text-decoration:none;
     }
     .embed-footer-logo{
-      height:44px; /* tydeligere */
+      height:44px;   /* større */
       width:auto;
       display:block;
       opacity:.95;
+    }
+    .embed-footer-link:focus-visible{
+      outline:3px solid rgba(202,107,42,.35);
+      outline-offset:6px;
+      border-radius:10px;
     }
 
     /* Mobil */
@@ -280,7 +285,7 @@
 
       .embed-footer{
         justify-content:center;
-        padding:16px 16px;
+        padding:18px 18px;
       }
       .embed-footer-logo{
         height:40px;
@@ -339,7 +344,7 @@
       <canvas></canvas>
     </div>
 
-    <!-- Logo under høydeprofil (klikkbar) -->
+    <!-- Logo under høydeprofil (klikkbar til rutesiden) -->
     <div class="embed-footer">
       <a id="routeLink" class="embed-footer-link" href="https://www.svingom.no" target="_top" rel="noopener">
         <img class="embed-footer-logo"
@@ -363,7 +368,7 @@
       err.style.display = "block";
       err.innerHTML =
         "Mangler <code>?route=...</code> i URL.<br><br>" +
-        "Eksempel: <code>?route=fjellruta-over-vegglifjell</code>";
+        "Eksempel: <code>?route=smadoldalen-rundt</code>";
       return;
     }
 
@@ -382,10 +387,18 @@
         const data = await res.json();
 
         let routeObj = null;
+
         if (Array.isArray(data?.routes)){
-          routeObj = data.routes.find(r => r.id === routeId);
-        } else if (data && typeof data === "object"){
-          routeObj = data[routeId] || Object.values(data).find(r => r?.id === routeId);
+          routeObj = data.routes.find(r => r?.id === routeId);
+        }
+        if (!routeObj && data && typeof data === "object" && !Array.isArray(data)){
+          routeObj = data[routeId] || null;
+        }
+        if (!routeObj && Array.isArray(data)){
+          routeObj = data.find(r => r?.id === routeId);
+        }
+        if (!routeObj && data && typeof data === "object" && !Array.isArray(data)){
+          routeObj = Object.values(data).find(r => r?.id === routeId) || null;
         }
 
         const nameNo =
@@ -413,7 +426,7 @@
 
     setTitleAndLinkFromRoutes(route);
 
-    // ---- Mobil-kollapslogikk (panel kan skjules og komme tilbake) ----
+    // ---- Mobil-kollapslogikk ----
     const openBtn = root.querySelector(".svingom-open-panel-btn");
     const mapEl = root.querySelector(".route-map");
     let collapsed = false;
@@ -472,7 +485,7 @@
       setCollapsed(false);
     });
 
-    // Klikk på POI/objekt i kartet åpner panel igjen (fallback)
+    // Klikk på POI/markør i kartet åpner panel igjen (hvis skjult)
     mapEl?.addEventListener("click", (ev)=>{
       if (!isMobile() || !collapsed) return;
       const hit = ev.target && (
@@ -483,7 +496,7 @@
       if (hit) setCollapsed(false);
     }, true);
 
-    // Hold kollapsknapp i live når master oppdaterer DOM
+    // Hold knapper og state stabile når master endrer DOM
     let scheduled = false;
     new MutationObserver(()=>{
       if (scheduled) return;
